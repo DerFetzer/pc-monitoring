@@ -1,0 +1,15 @@
+[package]
+name = "pc-monitoring-host"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pc-monitoring-lib = { path = "../lib", features = ["std"]}
+serialport = "4.0.1"
+clap = { version = "3.0.14", features = ["derive"]}
+log = "^0.4"
+systemd-journal-logger = "0.5.0"
+simple_logger = "2.1.0"

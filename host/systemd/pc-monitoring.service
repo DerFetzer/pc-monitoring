@@ -1,0 +1,11 @@
+[Unit]
+Description=pc-monitoring
+
+[Service]
+Restart=always
+RestartSec=10s
+
+ExecStart=/home/derfetzer/.cargo/bin/pc-monitoring-host --serial "/dev/ttyWT" --serial-baud 115200 --sensor-name nct6797 --channel-control pwm2_enable --channel-control-value 1 --channel-pwm pwm2 --control-points "0:80,30:80,40:150,50:255,100:255"
+
+[Install]
+WantedBy=multi-user.target

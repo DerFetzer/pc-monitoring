@@ -1,0 +1,17 @@
+[tasks.format-lib]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--manifest-path=lib/Cargo.toml"]
+
+[tasks.format-embedded]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--manifest-path=embedded/Cargo.toml"]
+
+[tasks.format-host]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--manifest-path=host/Cargo.toml"]
+
+[tasks.fmt]
+run_task = { name = ["format-lib", "format-embedded", "format-host"], parallel = true }
