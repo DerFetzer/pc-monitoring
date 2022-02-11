@@ -1,17 +1,10 @@
-[tasks.format-lib]
-install_crate = "rustfmt"
-command = "cargo"
-args = ["fmt", "--manifest-path=lib/Cargo.toml"]
+[env]
+# this tells cargo-make that this directory acts as a workspace root
+CARGO_MAKE_WORKSPACE_EMULATION = true
 
-[tasks.format-embedded]
-install_crate = "rustfmt"
-command = "cargo"
-args = ["fmt", "--manifest-path=embedded/Cargo.toml"]
-
-[tasks.format-host]
-install_crate = "rustfmt"
-command = "cargo"
-args = ["fmt", "--manifest-path=host/Cargo.toml"]
-
-[tasks.fmt]
-run_task = { name = ["format-lib", "format-embedded", "format-host"], parallel = true }
+# a list of crate members. since we do not have a Cargo.toml, we will need to specify this in here.
+CARGO_MAKE_CRATE_WORKSPACE_MEMBERS = [
+    "lib",
+    "embedded",
+    "host"
+]
