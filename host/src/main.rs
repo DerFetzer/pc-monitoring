@@ -6,10 +6,15 @@ use simple_logger::SimpleLogger;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
+use std::num::ParseIntError;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
 use systemd_journal_logger::{connected_to_journal, init_with_extra_fields};
+
+fn parse_hex(input: &str) -> Result<u16, ParseIntError> {
+    u16::from_str_radix(input, 16)
+}
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -41,6 +46,18 @@ struct Args {
     /// Comma-separated pairs of temperature and PWM values, i.e. "20:100, 30:150"
     #[clap(short, long)]
     control_points: String,
+
+    /// USB PID for resetting
+    #[clap(short, long, parse(try_from_str = parse_hex))]
+    usb_pid: u16,
+
+    /// USB VID for resetting
+    #[clap(short, long, parse(try_from_str = parse_hex))]
+    usb_vid: u16,
+
+    /// USB PID for resetting
+    #[clap(short, long)]
+    usb_serial: Option<String>,
 }
 
 struct ControlPoints(Vec<(u8, u8)>);
@@ -108,16 +125,15 @@ fn main() {
     let control_path = sensor_dir.path().join(args.channel_control);
     let pwm_path = sensor_dir.path().join(args.channel_pwm);
 
-    fs::write(control_path, args.channel_control_value).unwrap();
-
     let control_points = ControlPoints::from(args.control_points);
 
     loop {
+        fs::write(&control_path, &args.channel_control_value).unwrap();
         fs::write(&pwm_path, "255").unwrap();
 
         let mut alive_counter = 0u8;
 
-        let mut input = serialport::new(args.serial.clone(), args.serial_baud)
+        let mut input = serialport::new(&args.serial, args.serial_baud)
             .timeout(Duration::from_millis(10))
             .open()
             .expect("Failed to open port");
@@ -131,6 +147,8 @@ fn main() {
             alive_counter += 1;
             if alive_counter >= 20 {
                 warn!("Could not read data from serial port. Reconnect...");
+                reset_usb(args.usb_pid, args.usb_vid, args.usb_serial.clone()).unwrap();
+                sleep(Duration::from_millis(2000));
                 break 'inner;
             }
             while let Ok(ct) = input.read(&mut raw_buf) {
@@ -140,10 +158,10 @@ fn main() {
                 }
 
                 let buf = &raw_buf[..ct];
-                let mut window = &buf[..];
+                let mut window = buf;
 
                 'cobs: while !window.is_empty() {
-                    window = match cobs_buf.feed::<Thermistor>(&window) {
+                    window = match cobs_buf.feed::<Thermistor>(window) {
                         FeedResult::Consumed => break 'cobs,
                         FeedResult::OverFull(new_wind) => new_wind,
                         FeedResult::DeserError(new_wind) => new_wind,
@@ -182,6 +200,31 @@ fn init_logging() {
         SimpleLogger::new().init().unwrap();
     }
     set_max_level(LevelFilter::Info);
+}
+
+fn reset_usb(pid: u16, vid: u16, sn: Option<String>) -> rusb::Result<()> {
+    let devs: Vec<_> = rusb::devices()?
+        .iter()
+        .filter(|dev| {
+            let descriptor = dev.device_descriptor().unwrap();
+            descriptor.product_id() == pid && descriptor.vendor_id() == vid
+        })
+        .collect();
+    let dev = if devs.len() == 1 {
+        devs.first().unwrap()
+    } else {
+        // Found multiple devices -> check serial number
+        devs.iter()
+            .find(|dev| {
+                &dev.open()
+                    .unwrap()
+                    .read_serial_number_string_ascii(&dev.device_descriptor().unwrap())
+                    .unwrap()
+                    == sn.as_ref().unwrap()
+            })
+            .unwrap()
+    };
+    dev.open()?.reset()
 }
 
 #[cfg(test)]

@@ -126,7 +126,7 @@ fn main() -> ! {
         defmt::println!("Data length: {:?}", data.len());
 
         dbg_pin.set_high();
-        uart.write(&data);
+        uart.write(data);
         dbg_pin.set_low();
 
         wfi();
